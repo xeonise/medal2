@@ -1,0 +1,25 @@
+[workspace]
+members = [
+    "cfg",
+    "ast",
+    "lua51-lifter",
+    "lua51-deserializer",
+    "luau-lifter",
+    "restructure",
+    "luau-worker",
+    "decomp-server"
+]
+
+[workspace.package]
+edition = "2021"
+authors = [
+    "Mathias Pedersen <mathias.pedersen834@gmail.com>",
+    "Jujhar Singh <jujharsmc@gmail.com>",
+    "Amit Bashan <amit.bashan@icloud.com>",
+]
+
+[profile.release]
+debug = true
+lto = true
+# strip = true
+# panic = "abort"
