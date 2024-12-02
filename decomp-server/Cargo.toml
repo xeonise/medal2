@@ -1,12 +1,16 @@
 [package]
 name = "decomp-server"
 version = "0.0.1"
-edition = "2021"  # You can adjust the edition, Rust 2021 is the default now
+edition = "2021"
 
 [dependencies]
-hyper = { version = "0.14", features = ["full"] }
 tokio = { version = "1", features = ["full"] }
+hyper = { version = "0.14", features = ["full"] }
 base64 = "0.13"
-luau-lifter = { path = "E:/Gaming/roblox/medal-main/luau-lifter" }
+luau-lifter = { path = "../luau-lifter" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+tokio-tungstenite = "*"
+futures-util = "*"
+log = "*"
+env_logger = "*"
