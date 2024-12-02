@@ -3,6 +3,7 @@ use hyper::{Body, Request, Response, Server};
 use base64::decode;
 use luau_lifter::decompile_bytecode;
 use std::convert::Infallible;
+use hyper::body::to_bytes;
 
 #[tokio::main]
 async fn main() {
@@ -24,19 +25,16 @@ async fn main() {
 }
 
 async fn decompiler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
-    let headers = req.headers();
+    let whole_body = to_bytes(req.into_body()).await.unwrap();
+    let base64_bytecode = String::from_utf8(whole_body.to_vec()).unwrap();
 
-    if let Some(base64_bytecode) = headers.get("decompile") {
-        match decode(base64_bytecode.as_bytes()) {
-            Ok(bytecode) => {
-                let decompiled = decompile_bytecode(&bytecode, 203);
-                Ok(Response::new(Body::from(format!("{}", decompiled))))
-            }
-            Err(e) => {
-                Ok(Response::new(Body::from(format!("Failed to decode base64 bytecode: {}", e))))
-            }
+    match decode(base64_bytecode.as_bytes()) {
+        Ok(bytecode) => {
+            let decompiled = decompile_bytecode(&bytecode, 203);
+            Ok(Response::new(Body::from(format!("{}", decompiled))))
         }
-    } else {
-        Ok(Response::new(Body::from("Missing 'decompile' header")))
+        Err(e) => {
+            Ok(Response::new(Body::from(format!("Failed to decode base64 bytecode: {}", e))))
+        }
     }
 }
