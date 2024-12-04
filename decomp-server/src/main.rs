@@ -1,61 +1,52 @@
-use futures_util::{SinkExt, StreamExt};
+use futures_util::StreamExt;
+use hyper::service::{make_service_fn, service_fn};
+use hyper::{Body, Request, Response, Server};
 use log::*;
+use serde::Deserialize;
+use std::convert::Infallible;
 use std::net::SocketAddr;
-use tokio::net::{TcpListener, TcpStream};
+use tokio::net::TcpListener;
+use tokio::sync::mpsc;
 use base64::decode;
 use luau_lifter::decompile_bytecode;
-use tokio_tungstenite::{
-    accept_async,
-    tungstenite::{protocol::Message, Error, Result},
-};
 
-async fn accept_connection(peer: SocketAddr, stream: TcpStream) {
-    if let Err(e) = handle_connection(peer, stream).await {
-        match e {
-            Error::ConnectionClosed | Error::Protocol(_) | Error::Utf8 => (),
-            err => error!("Error processing connection: {}", err),
-        }
-    }
-}
-
-async fn decompiler(base64_b: String) -> Result<Message> {
+async fn decompiler(base64_b: String) -> Result<String, String> {
     match decode(base64_b.as_bytes()) {
         Ok(bytecode) => {
             let decompiled = decompile_bytecode(&bytecode, 203);
-            Ok(Message::text(format!("{}", decompiled)))
+            Ok(format!("{}", decompiled))
         }
-        Err(e) => Ok(Message::text(format!("Failed to decode base64 bytecode: {}", e))),
+        Err(e) => Err(format!("Failed to decode base64 bytecode: {}", e)),
     }
 }
 
-async fn handle_connection(peer: SocketAddr, stream: TcpStream) -> Result<()> {
-    let mut ws_stream = accept_async(stream).await.expect("Failed to accept");
+async fn handle_request(req: Request<Body>) -> Result<Response<Body>, Infallible> {
+    let bytes = hyper::body::to_bytes(req.into_body()).await.unwrap();
+    let base64_bytecode = String::from_utf8(bytes.to_vec()).unwrap();
 
-    info!("New WebSocket connection: {}", peer);
-
-    while let Some(msg) = ws_stream.next().await {
-        let msg = msg?;
-        let sendmsg = decompiler(msg.to_string()).await?; // Adjusted this line
-        if msg.is_text() || msg.is_binary() {
-            ws_stream.send(sendmsg).await?;
-        }
+    match decompiler(base64_bytecode).await {
+        Ok(decompiled_code) => Ok(Response::new(Body::from(decompiled_code))),
+        Err(e) => Ok(Response::new(Body::from(e))),
     }
-
-    Ok(())
 }
 
 #[tokio::main]
 async fn main() {
     env_logger::init();
 
-    let addr = "127.0.0.1:9002";
-    let listener = TcpListener::bind(&addr).await.expect("Can't listen");
-    info!("Listening on: {}", addr);
+    let addr = SocketAddr::from(([127, 0, 0, 1], 9002));
 
-    while let Ok((stream, _)) = listener.accept().await {
-        let peer = stream.peer_addr().expect("connected streams should have a peer address");
-        info!("Peer address: {}", peer);
+    let make_svc = make_service_fn(|_conn| {
+        async {
+            Ok::<_, Infallible>(service_fn(handle_request))
+        }
+    });
 
-        tokio::spawn(accept_connection(peer, stream));
+    let server = Server::bind(&addr).serve(make_svc);
+
+    println!("Listening on http://{}", addr);
+
+    if let Err(e) = server.await {
+        eprintln!("Server error: {}", e);
     }
 }
