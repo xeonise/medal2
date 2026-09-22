@@ -1,4 +1,8 @@
+
+
 Medal's LuaU decompiler
+
+Run the decompilation server with `cargo run -p decomp-server`.
 
 All credits to this project goes to in honor and memory of:
 Jujhar Singh (KowalskiFX)
